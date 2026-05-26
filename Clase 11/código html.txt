@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Gestor de Tareas · Patrones de Diseño</title>
+  <link rel="stylesheet" href="estilos.css" />
+</head>
+<body>
+
+<!-- =====================================================================
+     HEADER — el badge "Tareas pendientes" se actualiza automáticamente.
+     Eso es el PATRÓN OBSERVER en acción: la vista reacciona a cada cambio
+     de estado sin que el usuario tenga que hacer nada extra.
+     ===================================================================== -->
+<header>
+  <div>
+    <h1>📋 Gestor de Tareas</h1>
+    <p>CTP San Pedro de Barva · Diseño de Software · 11° Año</p>
+  </div>
+  <div id="badge-contador">0 pendientes</div>
+</header>
+
+<!-- Notificación flotante que aparece sola — también es Observer -->
+<div id="notificacion">✅ Lista actualizada</div>
+
+<main>
+
+  <!-- ==================================================================
+       TARJETA 1 — AGREGAR TAREA
+       PATRÓN: OBSERVER
+       Cada vez que se agrega o completa una tarea, el badge del encabezado
+       y la notificación flotante se actualizan solos. Nadie los llama
+       directamente: "observan" el estado de la lista.
+       ================================================================== -->
+  <div class="card">
+    <h2>
+      ➕ Agregar tarea
+      <span class="tag-patron tag-observer">Observer</span>
+    </h2>
+
+    <div class="form-row">
+      <input type="text" id="input-tarea" placeholder="Escribí el nombre de la tarea…" />
+      <button class="btn-primary" onclick="agregarTarea()">Agregar</button>
+    </div>
+  </div>
+
+  <!-- ==================================================================
+       TARJETA 2 — LISTA DE TAREAS CON ORDENAMIENTO
+       PATRÓN: STRATEGY (zona del estudiante) + OBSERVER (la lista en sí)
+       El selector de orden tiene tres opciones. Cada una es una estrategia
+       diferente de ordenamiento. LAS FUNCIONES YA ESTÁN ESCRITAS abajo,
+       el estudiante solo debe conectar el evento del <select>.
+       ================================================================== -->
+  <div class="card seccion-estudiante">
+    <h2>
+      📂 Lista de tareas
+      <span class="tag-patron tag-strategy">Strategy — tu tarea</span>
+    </h2>
+
+    <div class="controls-row" style="margin-bottom: 16px;">
+      <label for="selector-orden">Ordenar por:</label>
+
+      <!-- ================================================================
+           👇 AQUÍ EMPIEZA TU TRABAJO — PATRÓN STRATEGY
+           Necesitás agregar el atributo:   onchange="aplicarEstrategia(this.value)"
+           al elemento <select> de abajo.
+
+           Ejemplo de cómo queda:
+             <select id="selector-orden" onchange="aplicarEstrategia(this.value)">
+
+           Las tres funciones de estrategia ya están escritas en el <script>:
+             • estrategiaNombre()  → ordena A → Z por nombre
+             • estrategiaFecha()   → ordena más reciente primero
+             • estrategiaEstado()  → pendientes primero, completadas al final
+
+           Solo conectá el evento. Podés usar IA para ayudarte,
+           pero asegurate de entender qué hace cada línea.
+           ================================================================ -->
+      <select id="selector-orden">
+        <option value="nombre">Nombre (A → Z)</option>
+        <option value="fecha">Fecha (más reciente)</option>
+        <option value="estado">Estado (pendientes primero)</option>
+      </select>
+
+    </div>
+
+    <!-- Aquí aparecen las tareas -->
+    <ul id="lista-tareas">
+      <li class="lista-vacia">Aún no hay tareas. ¡Agregá una arriba!</li>
+    </ul>
+  </div>
+
+  <!-- ==================================================================
+       TARJETA 3 — DESHACER ÚLTIMA ACCIÓN
+       PATRÓN: COMMAND
+       Cada acción (agregar, completar, eliminar) se guarda como un objeto
+       en una pila. El botón "Deshacer" ejecuta el método undo() del último
+       objeto guardado, revirtiendo exactamente lo que se hizo.
+       ================================================================== -->
+  <div class="card">
+    <h2>
+      ↩️ Historial de acciones
+      <span class="tag-patron tag-command">Command</span>
+    </h2>
+
+    <div id="historial">Ninguna acción registrada todavía.</div>
+
+    <div style="margin-top: 12px;">
+      <button class="btn-undo" id="btn-deshacer" onclick="deshacerUltimaAccion()" disabled>
+        ↩ Deshacer última acción
+      </button>
+    </div>
+  </div>
+
+</main>
+
+<footer>CTP San Pedro de Barva · Actividad: Patrones de Diseño aplicados a Interfaz de Usuario</footer>
+
+
+<!-- =====================================================================
+     JAVASCRIPT — toda la lógica de los tres patrones
+     ===================================================================== -->
+<script>
+
+  // ===========================================================
+  //  ESTADO GLOBAL
+  //  Un arreglo de objetos. Cada tarea tiene: id, nombre, fecha, completada
+  // ===========================================================
+  let tareas = [];
+  let contadorId = 0;
+
+  // ===========================================================
+  //  PATRÓN OBSERVER
+  //
+  //  Concepto: cuando el estado cambia, los "observadores" se
+  //  notifican solos. Aquí, notificarObservadores() es llamada
+  //  después de CADA cambio en la lista de tareas.
+  //  Los observadores son: el badge del encabezado y la notificación.
+  // ===========================================================
+
+  function notificarObservadores(mensaje) {
+    actualizarBadge();       // Observador 1: badge del encabezado
+    mostrarNotificacion(mensaje); // Observador 2: popup flotante
+  }
+
+  function actualizarBadge() {
+    const pendientes = tareas.filter(t => !t.completada).length;
+    const badge = document.getElementById('badge-contador');
+    badge.textContent = pendientes + (pendientes === 1 ? ' pendiente' : ' pendientes');
+
+    // Efecto visual de pulso
+    badge.classList.remove('pulso');
+    void badge.offsetWidth; // fuerza reflow para reiniciar la animación
+    badge.classList.add('pulso');
+    setTimeout(() => badge.classList.remove('pulso'), 300);
+  }
+
+  function mostrarNotificacion(msg) {
+    const n = document.getElementById('notificacion');
+    n.textContent = msg;
+    n.classList.add('visible');
+    setTimeout(() => n.classList.remove('visible'), 2000);
+  }
+
+  // ===========================================================
+  //  PATRÓN COMMAND
+  //
+  //  Concepto: cada acción del usuario se guarda como un objeto
+  //  con un método undo(). La pila permite revertir la última acción.
+  //
+  //  Comandos disponibles:
+  //    ComandoAgregar   → guarda la tarea; undo() la elimina
+  //    ComandoCompletar → guarda el estado anterior; undo() lo restaura
+  //    ComandoEliminar  → guarda los datos de la tarea; undo() la reactiva
+  // ===========================================================
+
+  let pilaComandos = [];
+
+  class ComandoAgregar {
+    constructor(tarea) { this.tarea = tarea; }
+    ejecutar() {
+      tareas.push(this.tarea);
+      registrarEnHistorial('Agregada: "' + this.tarea.nombre + '"');
+    }
+    undo() {
+      tareas = tareas.filter(t => t.id !== this.tarea.id);
+      registrarEnHistorial('↩ Deshecha: "' + this.tarea.nombre + '" eliminada');
+    }
+  }
+
+  class ComandoCompletar {
+    constructor(id, estadoAnterior) {
+      this.id = id;
+      this.estadoAnterior = estadoAnterior;
+    }
+    ejecutar() {
+      const t = tareas.find(t => t.id === this.id);
+      if (t) {
+        t.completada = !this.estadoAnterior;
+        registrarEnHistorial((t.completada ? 'Completada' : 'Reabierta') + ': "' + t.nombre + '"');
+      }
+    }
+    undo() {
+      const t = tareas.find(t => t.id === this.id);
+      if (t) {
+        t.completada = this.estadoAnterior;
+        registrarEnHistorial('↩ Revertida: "' + t.nombre + '" volvió a estado anterior');
+      }
+    }
+  }
+
+  class ComandoEliminar {
+    constructor(tarea, posicion) { this.tarea = tarea; this.posicion = posicion; }
+    ejecutar() {
+      tareas = tareas.filter(t => t.id !== this.tarea.id);
+      registrarEnHistorial('Eliminada: "' + this.tarea.nombre + '"');
+    }
+    undo() {
+      tareas.splice(this.posicion, 0, this.tarea);
+      registrarEnHistorial('↩ Restaurada: "' + this.tarea.nombre + '"');
+    }
+  }
+
+  function ejecutarComando(cmd) {
+    cmd.ejecutar();
+    pilaComandos.push(cmd);
+    document.getElementById('btn-deshacer').disabled = false;
+  }
+
+  function deshacerUltimaAccion() {
+    if (pilaComandos.length === 0) return;
+    const ultimo = pilaComandos.pop();
+    ultimo.undo();
+    if (pilaComandos.length === 0) {
+      document.getElementById('btn-deshacer').disabled = true;
+    }
+    renderizarLista();
+    notificarObservadores('↩ Acción deshecha');
+  }
+
+  function registrarEnHistorial(texto) {
+    const hora = new Date().toLocaleTimeString('es-CR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    document.getElementById('historial').textContent = '[' + hora + '] ' + texto;
+  }
+
+  // ===========================================================
+  //  PATRÓN STRATEGY
+  //
+  //  Concepto: cada forma de ordenar es una estrategia separada.
+  //  El código que muestra la lista no cambia; solo cambia
+  //  cuál función de ordenamiento se usa.
+  //
+  //  Las tres estrategias ya están escritas. El estudiante debe
+  //  conectar el <select> para que llamen a aplicarEstrategia().
+  // ===========================================================
+
+  let estrategiaActual = 'nombre'; // estrategia por defecto
+
+  function aplicarEstrategia(valor) {
+    estrategiaActual = valor;
+    renderizarLista();
+    notificarObservadores('Orden cambiado: ' + valor);
+  }
+
+  function estrategiaNombre(lista) {
+    // Ordena alfabéticamente por nombre de A a Z
+    return [...lista].sort((a, b) => a.nombre.localeCompare(b.nombre));
+  }
+
+  function estrategiaFecha(lista) {
+    // Ordena por fecha de creación, más reciente primero
+    return [...lista].sort((a, b) => b.id - a.id);
+  }
+
+  function estrategiaEstado(lista) {
+    // Pone las tareas pendientes primero, completadas al final
+    return [...lista].sort((a, b) => Number(a.completada) - Number(b.completada));
+  }
+
+  function obtenerListaOrdenada() {
+    if (estrategiaActual === 'nombre')  return estrategiaNombre(tareas);
+    if (estrategiaActual === 'fecha')   return estrategiaFecha(tareas);
+    if (estrategiaActual === 'estado')  return estrategiaEstado(tareas);
+    return tareas;
+  }
+
+  // ===========================================================
+  //  RENDERIZADO — construye el HTML de la lista de tareas
+  // ===========================================================
+
+  function renderizarLista() {
+    const ul = document.getElementById('lista-tareas');
+    const ordenada = obtenerListaOrdenada();
+
+    if (ordenada.length === 0) {
+      ul.innerHTML = '<li class="lista-vacia">Aún no hay tareas. ¡Agregá una arriba!</li>';
+      return;
+    }
+
+    ul.innerHTML = ordenada.map(t => `
+      <li class="tarea-item ${t.completada ? 'completada' : ''}" id="tarea-${t.id}">
+        <input type="checkbox" ${t.completada ? 'checked' : ''}
+               onchange="completarTarea(${t.id})" />
+        <span class="tarea-nombre">${t.nombre}</span>
+        <span class="tarea-fecha">${t.fecha}</span>
+        <button class="btn-danger" onclick="eliminarTarea(${t.id})">Eliminar</button>
+      </li>
+    `).join('');
+  }
+
+  // ===========================================================
+  //  ACCIONES DEL USUARIO
+  // ===========================================================
+
+  function agregarTarea() {
+    const input = document.getElementById('input-tarea');
+    const nombre = input.value.trim();
+    if (!nombre) { input.focus(); return; }
+
+    const nuevaTarea = {
+      id: ++contadorId,
+      nombre,
+      completada: false,
+      fecha: new Date().toLocaleTimeString('es-CR', { hour: '2-digit', minute: '2-digit' })
+    };
+
+    const cmd = new ComandoAgregar(nuevaTarea);
+    ejecutarComando(cmd);
+
+    input.value = '';
+    input.focus();
+    renderizarLista();
+    notificarObservadores('✅ Tarea agregada');
+  }
+
+  function completarTarea(id) {
+    const tarea = tareas.find(t => t.id === id);
+    if (!tarea) return;
+
+    const cmd = new ComandoCompletar(id, tarea.completada);
+    ejecutarComando(cmd);
+
+    renderizarLista();
+    notificarObservadores(tarea.completada ? '🔄 Tarea reabierta' : '✅ Tarea completada');
+  }
+
+  function eliminarTarea(id) {
+    const pos = tareas.findIndex(t => t.id === id);
+    if (pos === -1) return;
+
+    const cmd = new ComandoEliminar(tareas[pos], pos);
+    ejecutarComando(cmd);
+
+    renderizarLista();
+    notificarObservadores('🗑 Tarea eliminada');
+  }
+
+  // Permitir agregar con Enter
+  document.getElementById('input-tarea').addEventListener('keydown', e => {
+    if (e.key === 'Enter') agregarTarea();
+  });
+
+</script>
+</body>
+</html>
